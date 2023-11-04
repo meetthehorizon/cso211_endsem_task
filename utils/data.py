@@ -69,7 +69,7 @@ def drop_invalid_smile(dataset, smilesColumnName='SMILES'):
     dataset = dataset[dataset[smilesColumnName].apply(is_valid_smiles)]
     return dataset
 
-def train_val_split(dataset, split_ratio=0.8, random_state=59):
+def train_val_split(dataset, split_ratio=0.8, random_state=104):
     """splits dataset into train and validation sets
     
     Parameters

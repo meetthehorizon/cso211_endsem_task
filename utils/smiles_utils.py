@@ -18,11 +18,7 @@ def get_atom_features(atom, use_chirality = True, hydrogens_implicit = True):
     """
 
     # define list of permitted atoms
-    permitted_list_of_atoms =  ['C','N','O','S','F','Si','P','Cl','Br','Mg',
-                                'Na','Ca','Fe','As','Al','I', 'B','V','K',
-                                'Tl','Yb','Sb','Sn','Ag','Pd','Co','Se','Ti',
-                                'Zn', 'Li','Ge','Cu','Au','Ni','Cd','In','Mn',
-                                'Zr','Cr','Pt','Hg','Pb','Unknown']
+    permitted_list_of_atoms =  ['C','N','O','Unknown']
     
     if hydrogens_implicit == False:
         permitted_list_of_atoms = ['H'] + permitted_list_of_atoms

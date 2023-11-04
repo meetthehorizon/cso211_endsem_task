@@ -3,8 +3,10 @@ import numpy as np
 from rdkit import Chem
 import torch, torchvision
 from torch_geometric.data import Data
+import dgl
 from utils.smiles_utils import get_atom_features, get_bond_features, one_hot_encoding
 from rdkit.Chem.rdmolops import GetAdjacencyMatrix
+from utils.helper import convert_torch_geometric_data_Data_to_dgl_graph
     
 # defining transformation classes
 class SmilesToGraph:
@@ -40,10 +42,12 @@ class SmilesToGraph:
         EF = torch.tensor(EF, dtype = torch.float)
         
         # construct label tensor
-        y_tensor = torch.tensor(np.array([label]))
+        y_tensor = torch.tensor(np.array([label])).view(1, 1)
 
         # construct Pytorch Geometric data object and append to data list
-        return Data(x = X, edge_index = E, edge_attr = EF, y = y_tensor)
+        d = Data(x = X, edge_index = E, edge_attr = EF, y = y_tensor)
+        return convert_torch_geometric_data_Data_to_dgl_graph(d), y_tensor
+        
 
 
 # defining dataset classes
@@ -60,13 +64,13 @@ class SmilesDataset(torch.utils.data.Dataset):
     def __getitem__(self, index):
         smile = self.dataset.iloc[index][self.smilesColumnName]
         label = self.dataset.iloc[index][self.labelColumnName]
-        graph = None
+        graph, y = None, None
 
         #applying transformations
         if self.Transform:
-            graph = self.Transform(smile, label)
+            graph, y = self.Transform(smile, label)
     
-        return graph
+        return graph, y
 
 if __name__ == '__main__':
     print('passed')
