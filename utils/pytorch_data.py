@@ -6,51 +6,61 @@ from torch_geometric.data import Data
 import dgl
 from utils.smiles_utils import get_atom_features, get_bond_features, one_hot_encoding
 from rdkit.Chem.rdmolops import GetAdjacencyMatrix
-from utils.helper import convert_torch_geometric_data_Data_to_dgl_graph
-    
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning, module="dgl")
 # defining transformation classes
-class SmilesToGraph:
-    def __call__(self, smile, label):
-        mol = Chem.MolFromSmiles(smile) # type: ignore
+class SmilesToGraph():
+    def __call__(self, smiles):
+        mol = Chem.MolFromSmiles(smiles) # type: ignore
 
-        # get feature dimensions
-        n_nodes = mol.GetNumAtoms()
-        n_edges = 2*mol.GetNumBonds()
-        unrelated_smiles = "O=O"
-        unrelated_mol = Chem.MolFromSmiles(unrelated_smiles) # type: ignore
-        n_node_features = len(get_atom_features(unrelated_mol.GetAtomWithIdx(0)))
-        n_edge_features = len(get_bond_features(unrelated_mol.GetBondBetweenAtoms(0,1)))
-        # construct node feature matrix X of shape (n_nodes, n_node_features)
-        X = np.zeros((n_nodes, n_node_features))
+        if mol is None:
+            return None
+
+        # Generate atom and bond features
+        num_atoms = mol.GetNumAtoms()
+        num_bonds = mol.GetNumBonds()
+
+
+        if mol is None:
+            return None
+
+        # Generate atom and bond features
+        num_atoms = mol.GetNumAtoms()
+        num_bonds = mol.GetNumBonds()
+
+        # Create a DGL graph
+        g = dgl.DGLGraph()
+
+        # Add nodes (atoms) to the graph
+        g.add_nodes(num_atoms)
+
+        # Extract atom features
+        atom_features = []
         for atom in mol.GetAtoms():
-            X[atom.GetIdx(), :] = get_atom_features(atom)
-            
-        X = torch.tensor(X, dtype = torch.float)
-        
-        # construct edge index array E of shape (2, n_edges)
-        (rows, cols) = np.nonzero(GetAdjacencyMatrix(mol)) # type: ignore
-        torch_rows = torch.from_numpy(rows.astype(np.int64)).to(torch.long)
-        torch_cols = torch.from_numpy(cols.astype(np.int64)).to(torch.long)
-        E = torch.stack([torch_rows, torch_cols], dim = 0)
-        
-        # construct edge feature array EF of shape (n_edges, n_edge_features)
-        EF = np.zeros((n_edges, n_edge_features))
-        
-        for (k, (i,j)) in enumerate(zip(rows, cols)):
-            EF[k] = get_bond_features(mol.GetBondBetweenAtoms(int(i),int(j)))
-        
-        EF = torch.tensor(EF, dtype = torch.float)
-        
-        # construct label tensor
-        y_tensor = torch.tensor(np.array([label])).view(1, 1)
+            atom_features.append(atom.GetAtomicNum())  # You can extract other features as needed
+        g.ndata['feat'] = torch.tensor(atom_features)
 
-        # construct Pytorch Geometric data object and append to data list
-        d = Data(x = X, edge_index = E, edge_attr = EF, y = y_tensor)
-        return convert_torch_geometric_data_Data_to_dgl_graph(d), y_tensor
+        # Add edges (bonds) to the graph
+        src_indices = []
+        dst_indices = []
+        bond_features = []
+
+        for bond in mol.GetBonds():
+            src_idx = bond.GetBeginAtomIdx()
+            dst_idx = bond.GetEndAtomIdx()
+            src_indices.extend([src_idx, dst_idx])
+            dst_indices.extend([dst_idx, src_idx])
+            bond_features.extend([bond.GetBondTypeAsDouble()] * 2)  # You can extract other features as needed
+
+        g.add_edges(src_indices, dst_indices)
+
+        # Set edge features (bond features)
+        g.edata['feat'] = torch.tensor(bond_features)
+
+        return g
         
-
-
-# defining dataset classes
+#defining dataset classes
 class SmilesDataset(torch.utils.data.Dataset):
     def __init__(self, dataset, smilesColumnName='smiles', labelColumnName='Label', Transform=SmilesToGraph()):
         self.dataset = dataset
@@ -64,13 +74,10 @@ class SmilesDataset(torch.utils.data.Dataset):
     def __getitem__(self, index):
         smile = self.dataset.iloc[index][self.smilesColumnName]
         label = self.dataset.iloc[index][self.labelColumnName]
-        graph, y = None, None
+        graph = self.Transform(smile)
 
-        #applying transformations
-        if self.Transform:
-            graph, y = self.Transform(smile, label)
-    
-        return graph, y
+        return graph, torch.tensor(label)
 
 if __name__ == '__main__':
-    print('passed')
+    molecule = "CCO"
+    
