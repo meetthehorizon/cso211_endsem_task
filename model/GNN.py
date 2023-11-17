@@ -136,4 +136,4 @@ for i in range(len(test_dataset)):
     
     total_corr += (label.item() > 0.5) == (prediction.item() > 0.5)
 
-print("Test Accuracy {}".format(total_corr / len(test_dataset)))
+print("Test Accuracy {}".format(total_corr / len(test_dataset)))-
